@@ -1,0 +1,252 @@
+!########################################################
+!#########################################################
+!#########################################################
+!#########################################################
+
+!========================================================
+module mond_disk_density
+
+  use amr_parameters
+  use mond_disk_parameters
+  use mond_parameters
+
+  implicit none
+
+
+  real(dp) :: G_kpc
+  real(dp) :: a0_kpc
+
+  real(dp) :: M_inner
+  real(dp) :: M_outer
+
+
+contains
+
+
+subroutine init_mond_disk(mass_disk,f_inner,f_outer)
+
+  implicit none
+
+  real(dp),intent(in)::mass_disk
+  real(dp),intent(in)::f_inner,f_outer
+
+  real(dp)::scale_l,scale_t
+  real(dp)::scale_d,scale_v
+  real(dp)::scale_nH,scale_T2
+
+  call units(scale_l,scale_t,scale_d,scale_v,scale_nH,scale_T2)
+
+  ! G in kpc (km/s)^2 / Msun
+  G_kpc = G_mond*1.d-3
+
+  ! MOND acceleration scale
+  if (a0_ms2 > 0.d0) then
+     a0_kpc = a0_ms2*100.d0/scale_l*scale_t**2
+  else
+     a0_kpc = a0_mond*1.d3
+  endif
+
+  M_inner = f_inner*mass_disk
+  M_outer = f_outer*mass_disk
+
+
+  write(*,*) "MOND initialization"
+  write(*,*) "G_kpc  =",G_kpc
+  write(*,*) "a0_kpc =",a0_kpc
+  write(*,*) "M_inner=",M_inner
+  write(*,*) "M_outer=",M_outer
+
+end subroutine init_mond_disk
+!========================================================
+
+
+!========================================================
+subroutine f_disk(r,rd,f)
+
+  implicit none
+
+  real(dp),intent(in)::r,rd
+  real(dp),intent(out)::f
+
+  f = 1.d0-exp(-r/rd)*(1.d0+r/rd)
+  
+end subroutine f_disk
+!========================================================
+
+
+
+!========================================================
+subroutine df_dr_disk(r,rd,df)
+
+  implicit none
+
+  real(dp),intent(in)::r,rd
+  real(dp),intent(out)::df
+
+  df = r/(rd*rd)*exp(-r/rd)
+
+end subroutine df_dr_disk
+!========================================================
+
+
+
+!========================================================
+subroutine alpha_mond(M,r,a)
+
+  implicit none
+
+  real(dp),intent(in)::M,r
+  real(dp),intent(out)::a
+
+  a = G_kpc*M/(a0_kpc*r*r)
+
+end subroutine alpha_mond
+!========================================================
+
+
+
+!========================================================
+subroutine nu_mond(M,r,rd,nu)
+
+  implicit none
+
+  real(dp),intent(in)::M,r,rd
+  real(dp),intent(out)::nu
+
+  real(dp)::y,a,f
+
+  call alpha_mond(M,r,a)
+  call f_disk(r,rd,f)
+
+  y=a*f
+
+  nu=0.5d0+sqrt(0.25d0+1.d0/y)
+
+end subroutine nu_mond
+!========================================================
+
+
+
+!========================================================
+subroutine dnu_dy(y,dndy)
+
+  implicit none
+
+  real(dp),intent(in)::y
+  real(dp),intent(out)::dndy
+
+  dndy=-1.d0/(2.d0*y*y*sqrt(0.25d0+1.d0/y))
+
+end subroutine dnu_dy
+!========================================================
+
+
+
+!========================================================
+subroutine dnu_dr_mond(M,r,rd,dnudr)
+
+  implicit none
+
+  real(dp),intent(in)::M,r,rd
+  real(dp),intent(out)::dnudr
+
+  real(dp)::a,f,df,y,dndy
+
+  call alpha_mond(M,r,a)
+  call f_disk(r,rd,f)
+  call df_dr_disk(r,rd,df)
+
+  y=a*f
+
+  call dnu_dy(y,dndy)
+
+  dnudr=dndy*a*(df-2.d0*f/r)
+
+end subroutine dnu_dr_mond
+!========================================================
+
+
+
+!========================================================
+subroutine dMc_dr(M,r,rd,dmdr)
+
+  implicit none
+
+  real(dp),intent(in)::M,r,rd
+  real(dp),intent(out)::dmdr
+
+  real(dp)::f,df,nu,dnudr
+
+
+  call f_disk(r,rd,f)
+  call df_dr_disk(r,rd,df)
+
+  call nu_mond(M,r,rd,nu)
+
+  call dnu_dr_mond(M,r,rd,dnudr)
+
+
+  dmdr=M*(f*dnudr+nu*df)
+
+
+end subroutine dMc_dr
+!========================================================
+
+
+
+!========================================================
+subroutine rho_disk_component(M,r,rd,rho)
+
+  implicit none
+
+  real(dp),intent(in)::M,r,rd
+  real(dp),intent(out)::rho
+
+  real(dp)::dmdr,pi
+
+  pi=acos(-1.d0)
+
+  call dMc_dr(M,r,rd,dmdr)
+
+  rho=dmdr/(4.d0*pi*r*r)
+  
+!  write(*,*)"Entering rho_disk_component routine", rho
+
+end subroutine rho_disk_component
+!========================================================
+
+
+
+!========================================================
+subroutine rho_disk_ana(r,rho)
+
+  implicit none
+
+  real(dp),intent(in)::r
+  real(dp),intent(out)::rho
+
+  real(dp)::rho1,rho2
+  
+write(*,*) "M_inner =",M_inner
+write(*,*) "M_outer =",M_outer
+write(*,*) "G_kpc   =",G_kpc
+write(*,*) "a0_kpc  =",a0_kpc
+write(*,*) "Rd_inner=",Rd_inner
+write(*,*) "Rd_outer=",Rd_outer
+
+  call rho_disk_component(M_inner,r,Rd_inner,rho1)
+
+  call rho_disk_component(M_outer,r,Rd_outer,rho2)
+ 
+
+  rho=rho1+rho2
+
+
+end subroutine rho_disk_ana
+
+end module mond_disk_density
+
+!========================================================
+
+
+

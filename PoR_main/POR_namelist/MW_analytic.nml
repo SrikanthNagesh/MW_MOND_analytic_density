@@ -1,0 +1,61 @@
+&RUN_PARAMS
+poisson=.true.
+pic=.true.
+mond=.true.
+debug=.false.
+verbose=.false.
+hydro=.false.
+nrestart=0
+/
+
+&AMR_PARAMS 
+levelmin=7
+levelmax=7
+ngridmax=1000000
+boxlen=100
+npartmax=2
+/
+
+&OUTPUT_PARAMS
+foutput=8000
+delta_tout=10. 
+tend=200.
+/
+
+&INIT_PARAMS
+filetype='ascii'
+initfile='test_particle.txt' 
+/
+
+&POISSON_PARAMS
+a0_ms2=1.2e-10
+m_threshold=1.0d30
+gravity_type=-1
+cg_levelmin=999
+/
+
+&MOND_DISK_PARAMS
+mass_disk=9.15d10
+f_inner=0.8236
+f_outer=0.1764
+rd_inner= 1.29
+rd_outer = 4.20
+rmax = 30
+/
+
+&BOUNDARY_PARAMS
+nboundary=6
+ibound_min=-1, 1, 0, 0, 0, 0,
+ibound_max=-1, 1, 0, 0, 0, 0,
+jbound_min= 0, 0,-1, 1, 0, 0,
+jbound_max= 0, 0,-1, 1, 0, 0,
+kbound_min= 0, 0, 0, 0,-1, 1,
+kbound_max= 0, 0, 0, 0,-1, 1,
+bound_type= 1, 1, 1, 1, 1, 1, 
+/
+
+&REFINE_PARAMS
+mass_sph=1.e-9
+m_refine=7*1.
+/
+
